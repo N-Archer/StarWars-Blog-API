@@ -32,8 +32,8 @@ def sitemap():
 
 @app.route('/user', methods=['GET'])
 def get_users():
-    all_users = User.query.all()
-    all_users = list(map(lambda x: x.serialize(), all_users))
+    users = User.query.all()
+    all_users = list(map(lambda x: x.serialize(), users))
     response_body = {
         "users": all_users
     }
@@ -44,13 +44,63 @@ def get_users():
 def get_favorites(user):
     if user == None:
         raise APIException("User Not Found", status_code=404)
-    all_favorites = Favorite.query.filter_by(username=user)
-    all_favorites = list(map(lambda x: x.serialize(), all_favorites))
+    favorites = Favorite.query.filter_by(username=user)
+    all_favorites = list(map(lambda x: x.serialize(), favorites))
     response_body = {
         "favorites": all_favorites
     }
 
     return jsonify(response_body), 200
+
+@app.route('/favorite/planet/<int:id>', methods=["POST", "DELETE"])
+def change_planet(id):
+    request_body = request.get_json()
+    if request_body is None or request_body == {}:
+        raise APIException("Empty Body", status_code=404)
+    if request.method == "POST":
+        new_planet = Favorite(entity_name=request_body['entity_name'], entity_type="planet", entity_id=id, username=request_body['username'])
+        db.session.add(new_planet)
+        db.session.commit()
+    if request.method == 'DELETE':
+        deleted_planet = Favorite.query.filter_by(username=request_body["username"], entity_type="planet", entity_id=id).first()
+        if deleted_planet is None:
+            raise APIException("User Not Found", status_code=404)
+        db.session.delete(deleted_planet)
+        db.session.commit()
+    favorites = Favorite.query.filter_by(username=request_body['username'])
+    all_favorites = list(map(lambda x: x.serialize(), favorites))
+    response_body = {
+        "Favorites": all_favorites
+    }
+
+    return jsonify(response_body), 200  
+
+@app.route('/favorite/person/<int:id>', methods=["POST", "DELETE"])
+def change_person(id):
+    request_body = request.get_json()
+
+    if request_body is None or request_body == {}:
+        raise APIException("Empty Body", status_code=404)
+    if request.method == "POST":
+        record = Favorite.query.filter_by(username=request_body['username'], entity_name=request_body['entity_name']).first()
+        if record:
+            raise APIException("Duplicate Entity_Name", status_code=409)
+        new_person = Favorite(entity_name=request_body['entity_name'], entity_type="person", entity_id=id, username=request_body['username'])
+        db.session.add(new_person)
+        db.session.commit()
+    if request.method == 'DELETE':
+        deleted_person = Favorite.query.filter_by(username=request_body["username"], entity_type="person", entity_id=id).first()
+        if deleted_person is None:
+            raise APIException("User Not Found", status_code=404)
+        db.session.delete(deleted_person)
+        db.session.commit() 
+    favorites = Favorite.query.filter_by(username=request_body['username'])
+    all_favorites = list(map(lambda x: x.serialize(), favorites))
+    response_body = {
+        "Favorites": all_favorites
+    }
+
+    return jsonify(response_body), 200  
 
 # this only runs if `$ python src/main.py` is executed
 if __name__ == '__main__':
