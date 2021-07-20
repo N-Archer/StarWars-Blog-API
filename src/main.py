@@ -2,6 +2,7 @@
 This module takes care of starting the API Server, Loading the DB and Adding the endpoints
 """
 import os
+import datetime
 from flask import Flask, request, jsonify, url_for
 from flask_migrate import Migrate
 from flask_swagger import swagger
@@ -9,6 +10,11 @@ from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
 from models import db, User, Favorite
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
 #from models import Person
 
 app = Flask(__name__)
@@ -20,6 +26,9 @@ db.init_app(app)
 CORS(app)
 setup_admin(app)
 
+app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
+jwt = JWTManager(app)
+
 # Handle/serialize errors like a JSON object
 @app.errorhandler(APIException)
 def handle_invalid_usage(error):
@@ -29,6 +38,24 @@ def handle_invalid_usage(error):
 @app.route('/')
 def sitemap():
     return generate_sitemap(app)
+
+@app.route("/login", methods=["POST"])
+def log_in():
+    # username = request.json.get("username", None)
+    credentials = request.get_json()
+    username = credentials.get ("username", None)
+    # password = request.json.get("password", None)
+    password = credentials.get ("password", None)
+    # Query your database for username and password
+    user = User.query.filter_by(username=username, password=password).first()
+    if user is None:
+        # the user was not found on the database
+        return jsonify({"msg": "Bad username or password"}), 401
+    
+    # create a new token with the user id inside
+    expires = datetime.timedelta(days=7)
+    access_token = create_access_token(identity=user.username, expires_delta=expires)
+    return jsonify({ "token": access_token, "user_id": user.username })
 
 @app.route('/user', methods=['GET'])
 def get_users():
@@ -101,6 +128,8 @@ def change_person(id):
     }
 
     return jsonify(response_body), 200  
+
+
 
 # this only runs if `$ python src/main.py` is executed
 if __name__ == '__main__':
