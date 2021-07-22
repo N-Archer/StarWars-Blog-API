@@ -57,6 +57,13 @@ def log_in():
     access_token = create_access_token(identity=user.username, expires_delta=expires)
     return jsonify({ "token": access_token, "user_id": user.username })
 
+@app.route('/auth', methods=['GET'])
+@jwt_required()
+def run_auth():
+    current_user_id = get_jwt_identity()
+
+    return jsonify(user=current_user_id), 200
+
 @app.route('/user', methods=['GET'])
 def get_users():
     users = User.query.all()
